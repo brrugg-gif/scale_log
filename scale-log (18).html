@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Load log">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1F2320">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%231F2320'/%3E%3Crect y='150' width='180' height='30' fill='%23E8A93B'/%3E%3Ctext x='90' y='95' font-family='Arial,sans-serif' font-weight='700' font-size='58' fill='%23F5F0E3' text-anchor='middle'%3EWT%3C/text%3E%3C/svg%3E">
+<title>Scale house log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1F2320;
+    --steel:#3E464A;
+    --steel-light:#5B6469;
+    --safety:#E8A93B;
+    --safety-dark:#B87F1E;
+    --paper:#F5F0E3;
+    --paper-dark:#EAE2CB;
+    --paper-line:#CFC7AC;
+    --rust:#B23A2E;
+    --rust-dark:#7E2A21;
+    --green-ok:#3B6B4A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    font-family:'Inter',sans-serif;
+    color:var(--paper);
+    min-height:100vh;
+    padding-bottom:calc(3rem + env(safe-area-inset-bottom));
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  .hazard-strip{
+    height:10px;
+    background:repeating-linear-gradient(135deg,var(--safety) 0 18px, var(--ink) 18px 36px);
+    padding-top:env(safe-area-inset-top);
+  }
+  header{
+    padding:1.75rem 1.5rem 1.25rem;
+    max-width:1080px;
+    margin:0 auto;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--safety);
+    margin:0 0 0.35rem;
+  }
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,5vw,42px);
+    letter-spacing:0.01em;
+    text-transform:uppercase;
+    margin:0;
+    color:var(--paper);
+  }
+  main{
+    max-width:1080px;
+    margin:0 auto;
+    padding:0 1.5rem;
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:1.5rem;
+    align-items:start;
+  }
+  @media (max-width:820px){
+    main{grid-template-columns:1fr;}
+  }
+
+  /* --- ticket card --- */
+  .ticket{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:2px;
+    position:relative;
+    padding:1.5rem 1.4rem 1.4rem;
+    box-shadow:0 12px 28px rgba(0,0,0,0.35);
+  }
+  .ticket::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:0;
+    border-top:2px dashed var(--paper-line);
+  }
+  .ticket-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    border-bottom:1px solid var(--paper-line);
+    padding-bottom:0.75rem;
+    margin-bottom:1rem;
+  }
+  .ticket-title{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin:0;
+  }
+  .ticket-no{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--steel-light);
+    text-align:right;
+  }
+  .ticket-no b{
+    display:block;
+    font-size:20px;
+    color:var(--ink);
+    letter-spacing:0.03em;
+  }
+  label{
+    display:block;
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--steel-light);
+    margin:0.85rem 0 0.3rem;
+  }
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=number], input[type=datetime-local], select, textarea{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:16px;
+    padding:0.65rem 0.6rem;
+    min-height:44px;
+    border:1px solid var(--paper-line);
+    background:#fff;
+    border-radius:3px;
+    color:var(--ink);
+    -webkit-appearance:none;
+    appearance:none;
+  }
+  select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235B6469'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 0.6rem center;
+    background-size:18px;
+    padding-right:2rem;
+  }
+  input[type=number]{font-family:'IBM Plex Mono',monospace;}
+  textarea{resize:vertical;min-height:44px;font-size:16px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;}
+  .unit-toggle{
+    display:flex;
+    border:1px solid var(--paper-line);
+    border-radius:3px;
+    overflow:hidden;
+    margin-top:0.3rem;
+    width:fit-content;
+  }
+  .unit-toggle button{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    padding:0.5rem 0.9rem;
+    min-height:44px;
+    border:none;
+    background:#fff;
+    color:var(--steel-light);
+    cursor:pointer;
+  }
+  .unit-toggle button.active{background:var(--ink);color:var(--safety);}
+
+  .readout{
+    margin-top:1.1rem;
+    background:var(--ink);
+    border-radius:3px;
+    padding:0.85rem 1rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .readout .lbl{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--steel-light);
+  }
+  .readout .val{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:24px;
+    font-weight:600;
+    color:var(--safety);
+  }
+  .readout .val.bad{color:var(--rust);}
+  .err{
+    font-size:12px;
+    color:var(--rust);
+    margin-top:0.3rem;
+    display:none;
+  }
+  .err.show{display:block;}
+
+  .submit-btn{
+    width:100%;
+    margin-top:1.1rem;
+    background:var(--rust);
+    color:#fff;
+    border:none;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding:0.7rem;
+    min-height:48px;
+    border-radius:3px;
+    cursor:pointer;
+  }
+  .submit-btn:hover{background:var(--rust-dark);}
+  .submit-btn:active{transform:scale(0.99);}
+
+  /* --- right column --- */
+  .metrics{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:0.75rem;
+    margin-bottom:1rem;
+  }
+  .metric{
+    background:var(--steel);
+    border-radius:3px;
+    padding:0.75rem 0.9rem;
+  }
+  .metric .lbl{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+    color:var(--safety);
+    margin-bottom:0.25rem;
+  }
+  .metric .num{
+    font-family:'Oswald',sans-serif;
+    font-size:22px;
+    font-weight:600;
+    color:var(--paper);
+  }
+  .tab-bar{
+    display:flex;
+    gap:0.4rem;
+    margin-bottom:0.75rem;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:2px;
+  }
+  .tab-bar::-webkit-scrollbar{display:none;}
+  .tab-btn{
+    font-family:'Oswald',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    background:transparent;
+    border:1px solid var(--steel-light);
+    color:var(--steel-light);
+    padding:0.6rem 1rem;
+    min-height:44px;
+    border-radius:3px;
+    cursor:pointer;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .tab-btn.active{
+    background:var(--safety);
+    border-color:var(--safety);
+    color:var(--ink);
+  }
+  .tab-btn:hover:not(.active){
+    border-color:var(--safety);
+    color:var(--safety);
+  }
+  .log-panel{
+    background:var(--steel);
+    border-radius:3px;
+    padding:0.9rem;
+  }
+  .log-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:0.6rem;
+    gap:0.5rem;
+    flex-wrap:wrap;
+  }
+  .log-panel-head h2{
+    font-family:'Oswald',sans-serif;
+    font-size:15px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin:0;
+    color:var(--paper);
+  }
+  .log-panel-head input[type=text]{
+    max-width:180px;
+    font-size:16px;
+    padding:0.4rem 0.5rem;
+    min-height:40px;
+  }
+  .csv-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    background:transparent;
+    border:1px solid var(--steel-light);
+    color:var(--paper);
+    padding:0.5rem 0.7rem;
+    min-height:40px;
+    border-radius:3px;
+    cursor:pointer;
+  }
+  .csv-btn:hover{border-color:var(--safety);color:var(--safety);}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--safety);
+    padding:0.4rem 0.5rem;
+    border-bottom:1px solid var(--steel-light);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:0.5rem;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+    color:var(--paper);
+    vertical-align:top;
+  }
+  tbody tr:hover{background:rgba(255,255,255,0.04);}
+  td.num{font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap;}
+  .del-btn{
+    background:none;
+    border:none;
+    color:var(--steel-light);
+    cursor:pointer;
+    font-size:14px;
+    padding:0.5rem 0.3rem;
+  }
+  .del-btn:hover{color:var(--rust);}
+  .edit-row-btn, .print-row-btn{color:var(--paper);}
+  .edit-row-btn:hover, .print-row-btn:hover{color:var(--safety);}
+  .empty{
+    text-align:center;
+    padding:2rem 1rem;
+    color:var(--steel-light);
+    font-size:13px;
+  }
+  .table-wrap{max-height:520px;overflow-y:auto;overflow-x:auto;}
+  #log-table{min-width:1150px;}
+  .actions-col{position:sticky;right:0;background:var(--steel);}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+
+  #print-ticket{display:none;}
+  @media print{
+    body > *:not(#print-ticket){display:none !important;}
+    #print-ticket{
+      display:block !important;
+      color:#000;
+      font-family:'Inter',sans-serif;
+      max-width:380px;
+      margin:0 auto;
+      padding:1rem;
+    }
+    #print-ticket h2{
+      font-family:'Oswald',sans-serif;
+      font-size:20px;
+      text-transform:uppercase;
+      border-bottom:2px dashed #999;
+      padding-bottom:0.5rem;
+      margin:0 0 0.75rem;
+      display:flex;
+      justify-content:space-between;
+    }
+    #print-ticket .pt-row{
+      display:flex;
+      justify-content:space-between;
+      font-size:13px;
+      padding:0.25rem 0;
+      border-bottom:1px solid #ddd;
+    }
+    #print-ticket .pt-row span:first-child{color:#555;}
+    #print-ticket .pt-net{
+      margin-top:0.75rem;
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      font-family:'IBM Plex Mono',monospace;
+      font-size:22px;
+      font-weight:600;
+    }
+  }
+</style>
+</head>
+<body>
+<h2 class="sr-only">A weigh scale load log: enter a preprinted scale ticket number, truck, driver, activity, material, material type, variety, an optional crop cert number, optional grain moisture and test weight, and gross and tare weights on a ticket form to compute net weight and bushels. The origin field adapts to the selected activity: a field for harvest, a bin for transfer, sell, or seed own use, a supplier for purchase, or a free-text name for third party. The destination field is a bin for most activities, a field for seed own use, and is optional only for third party. View a bin capacity status table with warnings at 75 percent full, a bin inventory summary showing net weight in and out of each bin broken down by activity, a separate production tab summarizing harvest loads by field, and a running ledger of recorded loads with totals, editing, and reprinting.</h2>
+
+<div class="hazard-strip"></div>
+<header>
+  <p class="eyebrow">Scale house</p>
+  <h1>Load log</h1>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--steel-light);margin:0.4rem 0 0;" id="storage-note"></p>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--rust);margin:0.3rem 0 0;display:none;" id="sync-error"></p>
+</header>
+
+<main>
+  <div class="ticket">
+    <div class="ticket-head">
+      <p class="ticket-title">Weigh ticket</p>
+      <div class="ticket-no">No.<b id="ticket-no">—</b></div>
+    </div>
+
+    <label for="f-scale-ticket">Scale ticket #</label>
+    <input type="text" id="f-scale-ticket" placeholder="Preprinted ticket number">
+
+    <label for="f-datetime">Date &amp; time</label>
+    <input type="datetime-local" id="f-datetime">
+
+    <div class="row2">
+      <div>
+        <label for="f-truck">Truck / unit</label>
+        <select id="f-truck"></select>
+      </div>
+      <div>
+        <label for="f-driver">Driver</label>
+        <select id="f-driver"></select>
+      </div>
+    </div>
+
+    <label for="f-activity">Activity <span style="color:var(--rust);">*</span></label>
+    <select id="f-activity">
+      <option value="">Select activity…</option>
+      <option value="Harvest">Harvest</option>
+      <option value="Transfer">Transfer</option>
+      <option value="Sell">Sell</option>
+      <option value="Purchase">Purchase</option>
+      <option value="Seed - Own Use">Seed - Own Use</option>
+      <option value="Third Party">Third Party</option>
+    </select>
+    <p class="err" id="activity-err">Select an activity.</p>
+
+    <label for="f-material">Material</label>
+    <select id="f-material"></select>
+
+    <label for="f-material-type">Material type <span style="color:var(--rust);">*</span></label>
+    <select id="f-material-type"></select>
+    <p class="err" id="material-type-err">Select a material type.</p>
+
+    <label for="f-variety">Variety</label>
+    <select id="f-variety"></select>
+
+    <label for="f-crop-cert">Crop cert number</label>
+    <input type="text" id="f-crop-cert" placeholder="Optional">
+
+    <div class="row2">
+      <div>
+        <label for="f-moisture">Moisture (%)</label>
+        <input type="number" id="f-moisture" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Optional">
+      </div>
+      <div>
+        <label for="f-density" id="density-label">Test weight</label>
+        <input type="number" id="f-density" min="0" step="0.1" inputmode="decimal" placeholder="Optional">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label for="f-origin" id="origin-label">Origin</label>
+        <select id="f-origin" style="display:none;"></select>
+        <p class="err" id="origin-err">Select an activity first.</p>
+      </div>
+      <div>
+        <label for="f-dest" id="dest-label">Destination</label>
+        <select id="f-dest"></select>
+        <p class="err" id="dest-err">Destination is required for this activity.</p>
+        <p id="dest-capacity-warning" style="display:none;font-size:12px;color:var(--safety);margin:0.3rem 0 0;"></p>
+      </div>
+    </div>
+
+    <label>Units</label>
+    <div class="unit-toggle">
+      <button type="button" id="unit-kg">kg</button>
+      <button type="button" id="unit-lb" class="active">lb</button>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label for="f-gross">Gross weight</label>
+        <input type="number" id="f-gross" min="0" step="1" inputmode="decimal" placeholder="0">
+      </div>
+      <div>
+        <label for="f-tare">Tare weight</label>
+        <input type="number" id="f-tare" min="0" step="1" inputmode="decimal" placeholder="0">
+      </div>
+    </div>
+    <p class="err" id="weight-err">Gross weight must be greater than tare weight.</p>
+
+    <div class="readout">
+      <span class="lbl">Net weight</span>
+      <span class="val" id="net-readout">—</span>
+    </div>
+    <div class="readout" id="bushel-readout" style="display:none;margin-top:0.4rem;">
+      <span class="lbl">Bushels</span>
+      <span class="val" id="bushel-val">—</span>
+    </div>
+
+    <label for="f-notes">Notes</label>
+    <textarea id="f-notes" placeholder="Optional"></textarea>
+
+    <button class="submit-btn" id="submit-btn">Record load</button>
+    <button class="submit-btn" id="cancel-edit-btn" style="background:transparent;border:1px solid var(--paper-line);color:var(--steel-light);margin-top:0.5rem;display:none;">Cancel edit</button>
+    <button class="submit-btn" id="print-btn" style="background:transparent;border:1px solid var(--paper-line);color:var(--steel-light);margin-top:0.5rem;display:none;">Print this ticket</button>
+  </div>
+
+  <div>
+    <div class="metrics">
+      <div class="metric"><div class="lbl">Loads logged</div><div class="num" id="m-count">0</div></div>
+      <div class="metric"><div class="lbl">Total net</div><div class="num" id="m-total">0</div></div>
+      <div class="metric"><div class="lbl">Avg net</div><div class="num" id="m-avg">0</div></div>
+    </div>
+
+    <div class="tab-bar">
+      <button type="button" class="tab-btn active" id="tab-ledger-btn">Scale ledger</button>
+      <button type="button" class="tab-btn" id="tab-bins-btn">Bin inventory</button>
+      <button type="button" class="tab-btn" id="tab-capacity-btn">Bin capacities</button>
+      <button type="button" class="tab-btn" id="tab-standard-btn">Standard weights</button>
+      <button type="button" class="tab-btn" id="tab-production-btn">Production</button>
+    </div>
+
+    <div class="log-panel" id="capacity-panel" style="display:none;">
+      <div class="log-panel-head">
+        <h2>Bin capacity</h2>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--steel-light);">
+        <div>
+          <label for="cap-bin-select" style="margin:0 0 0.3rem;">Bin</label>
+          <select id="cap-bin-select"></select>
+        </div>
+        <div>
+          <label for="cap-bin-value" style="margin:0 0 0.3rem;">Capacity (bu)</label>
+          <input type="number" id="cap-bin-value" min="0" step="1" inputmode="decimal" placeholder="e.g. 5000" style="width:120px;">
+        </div>
+        <button class="csv-btn" id="cap-bin-save" style="height:44px;">Save capacity</button>
+      </div>
+      <div class="table-wrap" style="max-height:420px;">
+        <table id="cap-table">
+          <thead>
+            <tr><th>Bin</th><th>Total (bu)</th><th>Capacity (bu)</th></tr>
+          </thead>
+          <tbody id="cap-body"></tbody>
+        </table>
+        <div class="empty" id="cap-empty">No bin capacities set yet.</div>
+      </div>
+      <p style="font-size:11px;color:var(--steel-light);margin:0.4rem 0 0;">* some loads have no test weight and no standard set for that material &nbsp; ~ total includes loads estimated from a standard test weight</p>
+    </div>
+
+    <div class="log-panel" id="standard-panel" style="display:none;">
+      <div class="log-panel-head">
+        <h2>Standard test weights</h2>
+      </div>
+      <p style="font-size:12px;color:var(--steel-light);margin:0 0 0.75rem;">Used to estimate bushels on tickets where test weight wasn't entered.</p>
+      <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--steel-light);">
+        <div>
+          <label for="std-material-select" style="margin:0 0 0.3rem;">Material</label>
+          <select id="std-material-select"></select>
+        </div>
+        <div>
+          <label for="std-weight-value" style="margin:0 0 0.3rem;">Test weight (lb/bu)</label>
+          <input type="number" id="std-weight-value" min="0" step="0.1" inputmode="decimal" placeholder="e.g. 60" style="width:120px;">
+        </div>
+        <button class="csv-btn" id="std-weight-save" style="height:44px;">Save standard</button>
+      </div>
+      <div class="table-wrap" style="max-height:420px;">
+        <table id="std-table">
+          <thead>
+            <tr><th>Material</th><th>Standard (lb/bu)</th></tr>
+          </thead>
+          <tbody id="std-body"></tbody>
+        </table>
+        <div class="empty" id="std-empty">No standard test weights set yet.</div>
+      </div>
+    </div>
+
+    <div class="log-panel" id="bin-panel" style="display:none;">
+      <div class="log-panel-head">
+        <h2>Bin inventory</h2>
+      </div>
+      <div class="table-wrap" style="max-height:520px;">
+        <table id="bin-table">
+          <thead>
+            <tr><th>Bin</th><th>Activity</th><th>Material</th><th>Type</th><th>Variety</th><th>Crop cert #</th><th>In</th><th>Out</th><th>Balance</th><th>% Full</th></tr>
+          </thead>
+          <tbody id="bin-body"></tbody>
+        </table>
+        <div class="empty" id="bin-empty">No destinations recorded yet. Bins will appear here once loads are logged.</div>
+      </div>
+    </div>
+
+    <div class="log-panel" id="production-panel" style="display:none;">
+      <div class="log-panel-head">
+        <h2>Production by field</h2>
+      </div>
+      <div class="table-wrap" style="max-height:280px;">
+        <table id="production-summary-table">
+          <thead>
+            <tr><th>Field</th><th>Material</th><th>Type</th><th>Variety</th><th>Crop cert #</th><th>Loads</th><th>Total net</th><th>Total bushels</th></tr>
+          </thead>
+          <tbody id="production-summary-body"></tbody>
+        </table>
+        <div class="empty" id="production-summary-empty">No harvest loads recorded yet.</div>
+      </div>
+
+      <div class="log-panel-head" style="margin-top:1.25rem;">
+        <h2>Harvest loads</h2>
+      </div>
+      <div class="table-wrap" style="max-height:520px;">
+        <table id="production-detail-table">
+          <thead>
+            <tr>
+              <th>No.</th><th>Scale #</th><th>Date</th><th>Truck</th><th>Driver</th><th>Field</th>
+              <th>Material</th><th>Type</th><th>Variety</th><th>Crop cert #</th><th>Moist %</th><th>Test wt</th>
+              <th>Bin</th><th>Net</th><th>Bushels</th>
+            </tr>
+          </thead>
+          <tbody id="production-detail-body"></tbody>
+        </table>
+        <div class="empty" id="production-detail-empty">No harvest loads recorded yet.</div>
+      </div>
+    </div>
+
+    <div class="log-panel" id="ledger-panel">
+      <div class="log-panel-head">
+        <h2>Ledger</h2>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <input type="text" id="search" placeholder="Filter truck, driver, material...">
+          <button class="csv-btn" id="csv-btn">&#8595; Excel</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="log-table">
+          <thead>
+            <tr>
+              <th>No.</th><th>Scale #</th><th>Date</th><th>Truck</th><th>Driver</th><th>Activity</th><th>Material</th><th>Type</th><th>Variety</th><th>Crop cert #</th>
+              <th>Moist %</th><th>Test wt</th>
+              <th>Route</th><th>Gross</th><th>Tare</th><th>Net</th><th>Bushels</th><th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody id="log-body"></tbody>
+        </table>
+        <div class="empty" id="empty-msg">No loads recorded yet. The first ticket you record will appear here.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="print-ticket">
+  <h2><span>Weigh ticket</span><span id="pt-no"></span></h2>
+  <div class="pt-row"><span>Scale ticket #</span><span id="pt-scale-no"></span></div>
+  <div class="pt-row"><span>Date</span><span id="pt-date"></span></div>
+  <div class="pt-row"><span>Truck</span><span id="pt-truck"></span></div>
+  <div class="pt-row"><span>Driver</span><span id="pt-driver"></span></div>
+  <div class="pt-row"><span>Activity</span><span id="pt-activity"></span></div>
+  <div class="pt-row"><span>Material</span><span id="pt-material"></span></div>
+  <div class="pt-row" id="pt-type-row"><span>Type</span><span id="pt-type"></span></div>
+  <div class="pt-row" id="pt-variety-row"><span>Variety</span><span id="pt-variety"></span></div>
+  <div class="pt-row" id="pt-cropcert-row"><span>Crop cert #</span><span id="pt-cropcert"></span></div>
+  <div class="pt-row" id="pt-quality-row"><span>Moisture / test wt</span><span id="pt-quality"></span></div>
+  <div class="pt-row"><span>Route</span><span id="pt-route"></span></div>
+  <div class="pt-row"><span>Gross</span><span id="pt-gross"></span></div>
+  <div class="pt-row"><span>Tare</span><span id="pt-tare"></span></div>
+  <div class="pt-net"><span>Net</span><span id="pt-net"></span></div>
+  <div class="pt-row" id="pt-bushels-row"><span>Bushels</span><span id="pt-bushels"></span></div>
+</div>
+
+<script>
+const STORAGE_KEY = 'scale-loads';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbycjIMfChKfnQUdQgL0iD0KI7PJ27DTzYUW3-SYADsA3n8nhYnErB9JbGJgeWTV6kdpVg/exec'; // paste your Apps Script /exec URL here
+const useSheets = SHEETS_URL.trim().length > 0;
+const useClaudeStorage = !useSheets && typeof window.storage !== 'undefined';
+let loads = [];
+let unit = 'lb';
+let editingId = null;
+
+function fmtNum(n){
+  return Math.round(n).toLocaleString();
+}
+
+function setDefaultDatetime(){
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('f-datetime').value = now.toISOString().slice(0,16);
+}
+
+function updateTicketNo(){
+  document.getElementById('ticket-no').textContent = String(loads.length + 1).padStart(4,'0');
+}
+
+function updateBushelReadout(net){
+  const box = document.getElementById('bushel-readout');
+  const val = document.getElementById('bushel-val');
+  if(net === null){
+    box.style.display = 'none';
+    return;
+  }
+  const density = document.getElementById('f-density').value;
+  const material = document.getElementById('f-material').value;
+  const pseudoLoad = {net, density, unit, material};
+  const bu = computeBushels(pseudoLoad);
+  if(bu === null){
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = 'flex';
+  const estimated = usedStandardTestWeight(pseudoLoad);
+  val.textContent = (estimated ? '~' : '') + bu.toFixed(1) + ' bu' + (estimated ? ' (estimated)' : '');
+}
+
+function updateReadout(){
+  const gross = parseFloat(document.getElementById('f-gross').value);
+  const tare = parseFloat(document.getElementById('f-tare').value);
+  const readout = document.getElementById('net-readout');
+  const err = document.getElementById('weight-err');
+  if(isNaN(gross) || isNaN(tare)){
+    readout.textContent = '—';
+    readout.classList.remove('bad');
+    err.classList.remove('show');
+    updateBushelReadout(null);
+    return null;
+  }
+  const net = gross - tare;
+  if(net <= 0){
+    readout.textContent = fmtNum(net) + ' ' + unit;
+    readout.classList.add('bad');
+    err.classList.add('show');
+    updateBushelReadout(null);
+    return null;
+  }
+  readout.textContent = fmtNum(net) + ' ' + unit;
+  readout.classList.remove('bad');
+  err.classList.remove('show');
+  updateBushelReadout(net);
+  return net;
+}
+
+function setUnit(u){
+  unit = u;
+  document.getElementById('unit-kg').classList.toggle('active', u==='kg');
+  document.getElementById('unit-lb').classList.toggle('active', u==='lb');
+  document.getElementById('density-label').textContent = u==='kg' ? 'Test weight (kg/hL)' : 'Test weight (lb/bu)';
+  updateReadout();
+  renderTable();
+  renderInventory();
+  renderProduction();
+  renderMetrics();
+}
+
+function renderDatalists(){
+  renderFixedSelects();
+  updateOriginField();
+  updateDestField();
+  updateDestCapacityWarning();
+  renderBinCapacityStatus();
+  renderStandardWeightsStatus();
+}
+
+const FIXED_FIELD_CONFIG = {
+  truck:  {selectId:'f-truck',  label:'truck',  defaults:[]},
+  driver: {selectId:'f-driver', label:'driver', defaults:[]},
+  material: {selectId:'f-material', label:'material', defaults:[]},
+  materialType: {selectId:'f-material-type', label:'material type', defaults:['Pedigree - Unclean','Pedigree - Clean','Commercial']},
+  variety: {selectId:'f-variety', label:'variety', defaults:[]}
+};
+let extraValues = {truck:[], driver:[], material:[], materialType:[], variety:[], dest:[], field:[], supplier:[], buyer:[], thirdParty:[]};
+
+async function loadExtraValues(){
+  if(useSheets){
+    try{
+      const res = await fetch(SHEETS_URL + '?type=lists');
+      if(!res.ok) throw new Error('Lists sheet returned status ' + res.status);
+      const rows = await res.json();
+      const grouped = {truck:[], driver:[], material:[], materialType:[], variety:[], dest:[], field:[], supplier:[], buyer:[], thirdParty:[]};
+      for(const r of rows){
+        if(!grouped[r.field]) grouped[r.field] = [];
+        grouped[r.field].push(r.value);
+      }
+      extraValues = grouped;
+    }catch(e){
+      console.error('Could not load shared lists', e);
+    }
+    return;
+  }
+  const key = 'scale-extra-values';
+  try{
+    if(useClaudeStorage){
+      const res = await window.storage.get(key, true);
+      if(res && res.value) extraValues = Object.assign(extraValues, JSON.parse(res.value));
+    }else{
+      const raw = localStorage.getItem(key);
+      if(raw) extraValues = Object.assign(extraValues, JSON.parse(raw));
+    }
+  }catch(e){ /* start with defaults */ }
+}
+
+async function saveExtraValues(){
+  const key = 'scale-extra-values';
+  try{
+    if(useClaudeStorage){
+      await window.storage.set(key, JSON.stringify(extraValues), true);
+    }else{
+      localStorage.setItem(key, JSON.stringify(extraValues));
+    }
+  }catch(e){ console.error('Could not save extra values', e); }
+}
+
+async function addExtraValueRemote(fieldKey, value){
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'addValue', field: fieldKey, value})
+      });
+      // Don't re-fetch immediately after posting — the sheet write can lag
+      // slightly behind the response, and re-fetching too soon would wipe
+      // out the value we just added locally before the sheet catches up.
+      // The local extraValues update (done by the caller) is authoritative
+      // for this session; other devices pick it up on their next page load.
+    }catch(e){
+      console.error('Could not sync new value to Google Sheets', e);
+    }
+  }else{
+    await saveExtraValues();
+  }
+}
+
+let binCapacities = {};
+
+async function loadBinCapacities(){
+  if(useSheets){
+    try{
+      const res = await fetch(SHEETS_URL + '?type=capacities');
+      if(!res.ok) throw new Error('Capacities sheet returned status ' + res.status);
+      const rows = await res.json();
+      const grouped = {};
+      for(const r of rows){
+        const num = parseFloat(r.capacity);
+        if(!isNaN(num)) grouped[r.bin] = num;
+      }
+      binCapacities = grouped;
+    }catch(e){
+      console.error('Could not load bin capacities', e);
+    }
+    return;
+  }
+  const key = 'scale-bin-capacities';
+  try{
+    if(useClaudeStorage){
+      const res = await window.storage.get(key, true);
+      if(res && res.value) binCapacities = JSON.parse(res.value);
+    }else{
+      const raw = localStorage.getItem(key);
+      if(raw) binCapacities = JSON.parse(raw);
+    }
+  }catch(e){ /* start empty */ }
+}
+
+async function setBinCapacityRemote(bin, capacity){
+  binCapacities[bin] = capacity;
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'setCapacity', bin, capacity})
+      });
+    }catch(e){
+      console.error('Could not sync bin capacity to Google Sheets', e);
+    }
+  }else{
+    const key = 'scale-bin-capacities';
+    try{
+      if(useClaudeStorage){
+        await window.storage.set(key, JSON.stringify(binCapacities), true);
+      }else{
+        localStorage.setItem(key, JSON.stringify(binCapacities));
+      }
+    }catch(e){ console.error('Could not save bin capacity', e); }
+  }
+}
+
+function binTotalBushels(binName){
+  let total = 0;
+  let hasAny = false;
+  let missingTestWeight = false;
+  let usedEstimate = false;
+  for(const l of loads){
+    const bu = computeBushels(l);
+    const isDest = l.dest === binName && destIsBinFor(l.activity);
+    const isOrigin = l.origin === binName && originIsBinFor(l.activity);
+    if(!isDest && !isOrigin) continue;
+    if(bu === null){ missingTestWeight = true; continue; }
+    if(usedStandardTestWeight(l)) usedEstimate = true;
+    if(isDest){ total += bu; hasAny = true; }
+    if(isOrigin){ total -= bu; hasAny = true; }
+  }
+  return {total, hasAny, missingTestWeight, usedEstimate};
+}
+
+function optionsFor(fieldKey){
+  const cfg = FIXED_FIELD_CONFIG[fieldKey];
+  const fromLoads = loads.map(l=>l[fieldKey]).filter(Boolean);
+  const combined = new Set([...cfg.defaults, ...(extraValues[fieldKey]||[]), ...fromLoads]);
+  return [...combined].sort();
+}
+
+function currentOriginMode(){
+  const act = document.getElementById('f-activity').value;
+  if(act === 'Harvest') return 'field';
+  if(act === 'Transfer' || act === 'Sell' || act === 'Seed - Own Use') return 'bin';
+  if(act === 'Purchase') return 'supplier';
+  if(act === 'Third Party') return 'thirdParty';
+  return 'none';
+}
+
+function originBucketKey(mode){
+  if(mode === 'bin') return 'dest';
+  if(mode === 'field') return 'field';
+  if(mode === 'supplier') return 'supplier';
+  if(mode === 'thirdParty') return 'thirdParty';
+  return null;
+}
+
+function bucketOptions(bucketKey){
+  if(bucketKey === 'dest'){
+    // Only loads where the destination actually functioned as a bin —
+    // Seed - Own Use stores a field name in dest, Sell stores a buyer name,
+    // neither of which should leak into the bin list.
+    const historical = loads.filter(l => l.dest && l.activity !== 'Seed - Own Use' && l.activity !== 'Sell').map(l => l.dest);
+    return [...new Set([...(extraValues.dest||[]), ...historical])].sort();
+  }
+  if(bucketKey === 'field'){
+    const historical = [
+      ...loads.filter(l => l.activity === 'Harvest').map(l => l.origin),
+      ...loads.filter(l => l.activity === 'Seed - Own Use').map(l => l.dest)
+    ].filter(Boolean);
+    return [...new Set([...(extraValues.field||[]), ...historical])].sort();
+  }
+  if(bucketKey === 'supplier'){
+    const historical = loads.filter(l => l.activity === 'Purchase').map(l => l.origin).filter(Boolean);
+    return [...new Set([...(extraValues.supplier||[]), ...historical])].sort();
+  }
+  if(bucketKey === 'buyer'){
+    const historical = loads.filter(l => l.activity === 'Sell').map(l => l.dest).filter(Boolean);
+    return [...new Set([...(extraValues.buyer||[]), ...historical])].sort();
+  }
+  if(bucketKey === 'thirdParty'){
+    const historical = loads.filter(l => l.activity === 'Third Party').map(l => l.origin).filter(Boolean);
+    return [...new Set([...(extraValues.thirdParty||[]), ...historical])].sort();
+  }
+  return optionsFor(bucketKey);
+}
+
+function updateOriginField(){
+  const mode = currentOriginMode();
+  const selectEl = document.getElementById('f-origin');
+  const labelEl = document.getElementById('origin-label');
+  const errEl = document.getElementById('origin-err');
+  errEl.classList.remove('show');
+
+  if(mode === 'none'){
+    selectEl.style.display = 'none';
+    labelEl.textContent = 'Origin';
+    errEl.textContent = 'Select an activity first.';
+    return;
+  }
+
+  selectEl.style.display = 'block';
+  const addLabel = mode === 'field' ? 'field' : mode === 'bin' ? 'bin' : mode === 'supplier' ? 'supplier' : 'third party';
+  labelEl.textContent = 'Origin (' + addLabel + ')';
+  errEl.textContent = 'Select a ' + addLabel + '.';
+
+  const bucketKey = originBucketKey(mode);
+  const current = selectEl.value;
+  const opts = bucketOptions(bucketKey);
+  selectEl.innerHTML =
+    `<option value="">Select ${addLabel}…</option>` +
+    opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
+    `<option value="__add_new__">+ Add new ${addLabel}</option>`;
+  if(opts.includes(current)) selectEl.value = current;
+}
+
+function getOriginValue(){
+  if(currentOriginMode() === 'none') return '';
+  return document.getElementById('f-origin').value;
+}
+
+function currentDestMode(){
+  const act = document.getElementById('f-activity').value;
+  if(act === 'Seed - Own Use') return 'field';
+  if(act === 'Sell') return 'buyer';
+  return 'bin';
+}
+
+function destBucketKey(mode){
+  if(mode === 'field') return 'field';
+  if(mode === 'buyer') return 'buyer';
+  return 'dest';
+}
+
+function destRequiredFor(activity){
+  return activity !== 'Third Party' && activity !== 'Sell';
+}
+
+function getDestValue(){
+  return document.getElementById('f-dest').value;
+}
+
+function updateDestField(){
+  const act = document.getElementById('f-activity').value;
+  const required = destRequiredFor(act);
+  const mode = currentDestMode();
+  const selectEl = document.getElementById('f-dest');
+  const labelEl = document.getElementById('dest-label');
+  const bucketKey = destBucketKey(mode);
+  const addLabel = mode === 'field' ? 'field' : mode === 'buyer' ? 'buyer' : 'bin';
+
+  labelEl.innerHTML = (mode === 'field' ? 'Destination (field)' : mode === 'buyer' ? 'Destination (buyer)' : 'Destination') +
+    (required ? ' <span style="color:var(--rust);">*</span>' : '');
+  document.getElementById('dest-err').textContent = mode === 'field'
+    ? 'Select a field.'
+    : mode === 'buyer'
+      ? 'Select a buyer.'
+      : 'Destination is required for this activity.';
+  document.getElementById('dest-err').classList.remove('show');
+
+  const current = selectEl.value;
+  const opts = bucketOptions(bucketKey);
+  selectEl.innerHTML =
+    `<option value="">Select ${addLabel}…</option>` +
+    opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
+    `<option value="__add_new__">+ Add new ${addLabel}</option>`;
+  if(opts.includes(current)) selectEl.value = current;
+}
+
+function updateDestCapacityWarning(){
+  const warningEl = document.getElementById('dest-capacity-warning');
+  if(currentDestMode() !== 'bin'){
+    warningEl.style.display = 'none';
+    return;
+  }
+  const binName = document.getElementById('f-dest').value;
+  if(!binName){
+    warningEl.style.display = 'none';
+    return;
+  }
+
+  const capacity = binCapacities[binName];
+  const {total, hasAny, missingTestWeight, usedEstimate} = binTotalBushels(binName);
+
+  if(!hasAny && !capacity){
+    warningEl.style.display = 'none';
+    return;
+  }
+
+  let note = '';
+  if(missingTestWeight) note = ' (some loads missing test weight and no standard set, actual level may be higher)';
+  else if(usedEstimate) note = ' (includes loads estimated from standard test weight)';
+
+  let text = binName + ': ' + (hasAny ? fmtNum(total) + ' bu currently' : 'no inventory recorded yet');
+  let color = 'var(--steel-light)';
+
+  if(capacity){
+    const pct = hasAny ? (total / capacity) * 100 : 0;
+    text += ' \u2014 ' + pct.toFixed(0) + '% of ' + fmtNum(capacity) + ' bu capacity';
+    if(pct >= 100) color = 'var(--rust)';
+    else if(pct >= 75) color = 'var(--safety)';
+  }
+  text += note;
+
+  warningEl.style.display = 'block';
+  warningEl.style.color = color;
+  warningEl.textContent = text;
+}
+
+function renderFixedSelects(){
+  for(const fieldKey of Object.keys(FIXED_FIELD_CONFIG)){
+    const cfg = FIXED_FIELD_CONFIG[fieldKey];
+    const select = document.getElementById(cfg.selectId);
+    const current = select.value;
+    const opts = optionsFor(fieldKey);
+    const placeholder = fieldKey === 'materialType' ? 'Select type…' : `Select ${cfg.label}…`;
+    select.innerHTML =
+      `<option value="">${placeholder}</option>` +
+      opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
+      `<option value="__add_new__">+ Add new ${cfg.label}</option>`;
+    if(opts.includes(current)) select.value = current;
+  }
+}
+
+function wireAddNewHandlers(){
+  for(const fieldKey of Object.keys(FIXED_FIELD_CONFIG)){
+    const cfg = FIXED_FIELD_CONFIG[fieldKey];
+    const select = document.getElementById(cfg.selectId);
+    select.addEventListener('change', async ()=>{
+      if(select.value !== '__add_new__') {
+        if(fieldKey === 'materialType' && select.value){
+          document.getElementById('material-type-err').classList.remove('show');
+        }
+        return;
+      }
+      const entered = window.prompt(`New ${cfg.label}:`);
+      if(!entered || !entered.trim()){
+        select.value = '';
+        return;
+      }
+      const value = entered.trim();
+      if(!extraValues[fieldKey]) extraValues[fieldKey] = [];
+      if(!extraValues[fieldKey].some(v => v.toLowerCase() === value.toLowerCase())){
+        extraValues[fieldKey].push(value);
+        await addExtraValueRemote(fieldKey, value);
+      }
+      renderFixedSelects();
+      select.value = value;
+      if(fieldKey === 'materialType'){
+        document.getElementById('material-type-err').classList.remove('show');
+      }
+    });
+  }
+
+  document.getElementById('f-activity').addEventListener('change', ()=>{
+    updateOriginField();
+    updateDestField();
+    const act = document.getElementById('f-activity').value;
+    if(act) document.getElementById('activity-err').classList.remove('show');
+  });
+
+  document.getElementById('f-origin').addEventListener('change', async ()=>{
+    const selectEl = document.getElementById('f-origin');
+    if(selectEl.value !== '__add_new__'){
+      if(selectEl.value) document.getElementById('origin-err').classList.remove('show');
+      return;
+    }
+    const mode = currentOriginMode();
+    const bucketKey = originBucketKey(mode);
+    const label = mode === 'field' ? 'field' : mode === 'bin' ? 'bin' : 'supplier';
+    const entered = window.prompt(`New ${label}:`);
+    if(!entered || !entered.trim()){
+      selectEl.value = '';
+      return;
+    }
+    const value = entered.trim();
+    if(!extraValues[bucketKey]) extraValues[bucketKey] = [];
+    if(!extraValues[bucketKey].some(v => v.toLowerCase() === value.toLowerCase())){
+      extraValues[bucketKey].push(value);
+      await addExtraValueRemote(bucketKey, value);
+    }
+    updateOriginField();
+    selectEl.value = value;
+    document.getElementById('origin-err').classList.remove('show');
+  });
+
+  document.getElementById('f-dest').addEventListener('change', async ()=>{
+    const selectEl = document.getElementById('f-dest');
+    if(selectEl.value !== '__add_new__'){
+      if(selectEl.value) document.getElementById('dest-err').classList.remove('show');
+      updateDestCapacityWarning();
+      return;
+    }
+    const mode = currentDestMode();
+    const bucketKey = destBucketKey(mode);
+    const label = mode === 'field' ? 'field' : mode === 'buyer' ? 'buyer' : 'bin';
+    const entered = window.prompt(`New ${label}:`);
+    if(!entered || !entered.trim()){
+      selectEl.value = '';
+      return;
+    }
+    const value = entered.trim();
+    if(!extraValues[bucketKey]) extraValues[bucketKey] = [];
+    if(!extraValues[bucketKey].some(v => v.toLowerCase() === value.toLowerCase())){
+      extraValues[bucketKey].push(value);
+      await addExtraValueRemote(bucketKey, value);
+    }
+    updateDestField();
+    selectEl.value = value;
+    document.getElementById('dest-err').classList.remove('show');
+    updateDestCapacityWarning();
+  });
+}
+
+function showSyncError(msg){
+  const el = document.getElementById('sync-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearSyncError(){
+  document.getElementById('sync-error').style.display = 'none';
+}
+
+async function loadData(){
+  try{
+    if(useSheets){
+      const res = await fetch(SHEETS_URL);
+      if(!res.ok) throw new Error('Sheet returned status ' + res.status);
+      loads = await res.json();
+      clearSyncError();
+    }else if(useClaudeStorage){
+      const res = await window.storage.get(STORAGE_KEY, true);
+      loads = res && res.value ? JSON.parse(res.value) : [];
+    }else{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      loads = raw ? JSON.parse(raw) : [];
+    }
+  }catch(e){
+    loads = [];
+    if(useSheets) showSyncError('Could not load from Google Sheets: ' + e.message + ' (see browser console for details)');
+    console.error('Load error', e);
+  }
+  updateTicketNo();
+  renderTable();
+  renderInventory();
+  renderProduction();
+  renderMetrics();
+  renderDatalists();
+}
+
+async function saveData(){
+  try{
+    if(useClaudeStorage){
+      await window.storage.set(STORAGE_KEY, JSON.stringify(loads), true);
+    }else if(!useSheets){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loads));
+    }
+  }catch(e){
+    console.error('Storage error', e);
+  }
+}
+
+async function addLoadRemote(entry){
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'add', load: entry})
+      });
+      clearSyncError();
+      await loadData();
+    }catch(e){
+      showSyncError('Load saved locally but did not sync to Google Sheets: ' + e.message + ' (see browser console)');
+      console.error('Add sync error', e);
+    }
+  }else{
+    await saveData();
+  }
+}
+
+async function deleteLoadRemote(id){
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'delete', id})
+      });
+      clearSyncError();
+      await loadData();
+    }catch(e){
+      showSyncError('Delete did not sync to Google Sheets: ' + e.message + ' (see browser console)');
+      console.error('Delete sync error', e);
+    }
+  }else{
+    await saveData();
+  }
+}
+
+async function updateLoadRemote(entry){
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'update', load: entry})
+      });
+      clearSyncError();
+      await loadData();
+    }catch(e){
+      showSyncError('Changes saved locally but did not sync to Google Sheets: ' + e.message + ' (see browser console)');
+      console.error('Update sync error', e);
+    }
+  }else{
+    await saveData();
+  }
+}
+
+const KG_PER_LB = 0.45359237;
+function toKg(value, fromUnit){
+  return fromUnit === 'lb' ? value * KG_PER_LB : value;
+}
+function fromKg(kgValue){
+  return unit === 'lb' ? kgValue / KG_PER_LB : kgValue;
+}
+
+const BUSHEL_LITERS = 35.2391;
+let materialStandardWeights = {}; // material name -> standard test weight in lb/bu
+
+function getStandardTestWeight(material){
+  if(!material) return null;
+  const key = Object.keys(materialStandardWeights).find(k => k.toLowerCase() === material.toLowerCase());
+  return key ? materialStandardWeights[key] : null;
+}
+
+function usedStandardTestWeight(load){
+  const density = parseFloat(load.density);
+  if(!isNaN(density) && density > 0) return false;
+  return getStandardTestWeight(load.material) !== null;
+}
+
+function computeBushels(load){
+  const net = parseFloat(load.net);
+  if(isNaN(net)) return null;
+  const density = parseFloat(load.density);
+
+  if(!isNaN(density) && density > 0){
+    if(load.unit === 'lb'){
+      // density entered as lb/bu — direct division
+      return net / density;
+    }else{
+      // density entered as kg/hL — convert to kg per bushel first
+      const kgPerBushel = density * (BUSHEL_LITERS / 100);
+      if(kgPerBushel <= 0) return null;
+      return net / kgPerBushel;
+    }
+  }
+
+  // No test weight entered for this load — fall back to the material's
+  // standard test weight (lb/bu), if one has been set.
+  const standard = getStandardTestWeight(load.material);
+  if(standard === null || standard <= 0) return null;
+  const netLb = load.unit === 'lb' ? net : net / KG_PER_LB;
+  return netLb / standard;
+}
+
+async function loadMaterialStandardWeights(){
+  if(useSheets){
+    try{
+      const res = await fetch(SHEETS_URL + '?type=materialStandards');
+      if(!res.ok) throw new Error('Material standards sheet returned status ' + res.status);
+      const rows = await res.json();
+      const grouped = {};
+      for(const r of rows){
+        const num = parseFloat(r.weight);
+        if(!isNaN(num)) grouped[r.material] = num;
+      }
+      materialStandardWeights = grouped;
+    }catch(e){
+      console.error('Could not load material standard weights', e);
+    }
+    return;
+  }
+  const key = 'scale-material-standards';
+  try{
+    if(useClaudeStorage){
+      const res = await window.storage.get(key, true);
+      if(res && res.value) materialStandardWeights = JSON.parse(res.value);
+    }else{
+      const raw = localStorage.getItem(key);
+      if(raw) materialStandardWeights = JSON.parse(raw);
+    }
+  }catch(e){ /* start empty */ }
+}
+
+async function setMaterialStandardWeightRemote(material, weight){
+  materialStandardWeights[material] = weight;
+  if(useSheets){
+    try{
+      await fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'setMaterialStandard', material, weight})
+      });
+    }catch(e){
+      console.error('Could not sync material standard weight to Google Sheets', e);
+    }
+  }else{
+    const key = 'scale-material-standards';
+    try{
+      if(useClaudeStorage){
+        await window.storage.set(key, JSON.stringify(materialStandardWeights), true);
+      }else{
+        localStorage.setItem(key, JSON.stringify(materialStandardWeights));
+      }
+    }catch(e){ console.error('Could not save material standard weight', e); }
+  }
+}
+
+function renderStandardWeightsStatus(){
+  const matSelect = document.getElementById('std-material-select');
+  const currentSelection = matSelect.value;
+  const materialNames = optionsFor('material');
+  matSelect.innerHTML = materialNames.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
+  if(materialNames.includes(currentSelection)) matSelect.value = currentSelection;
+
+  const body = document.getElementById('std-body');
+  const emptyMsg = document.getElementById('std-empty');
+  const materialsWithStandard = Object.keys(materialStandardWeights).sort();
+
+  body.innerHTML = '';
+  if(materialsWithStandard.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  for(const material of materialsWithStandard){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${material}</td>
+      <td class="num">${fmtNum(materialStandardWeights[material])}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function renderBinCapacityStatus(){
+  const capSelect = document.getElementById('cap-bin-select');
+  const currentBinSelection = capSelect.value;
+  const binNames = bucketOptions('dest');
+  capSelect.innerHTML = binNames.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
+  if(binNames.includes(currentBinSelection)) capSelect.value = currentBinSelection;
+
+  const body = document.getElementById('cap-body');
+  const emptyMsg = document.getElementById('cap-empty');
+  const binsWithCapacity = Object.keys(binCapacities).sort();
+
+  body.innerHTML = '';
+  if(binsWithCapacity.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  for(const binName of binsWithCapacity){
+    const capacity = binCapacities[binName];
+    const {total, hasAny, missingTestWeight, usedEstimate} = binTotalBushels(binName);
+    const marker = missingTestWeight ? ' *' : (usedEstimate ? ' ~' : '');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${binName}</td>
+      <td class="num">${hasAny ? fmtNum(total) : '—'}${marker}</td>
+      <td class="num">${fmtNum(capacity)}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function originIsBinFor(activity){
+  return activity === 'Transfer' || activity === 'Sell' || activity === 'Seed - Own Use';
+}
+function destIsBinFor(activity){
+  return activity !== 'Seed - Own Use' && activity !== 'Sell';
+}
+
+function renderInventory(){
+  const bins = {};
+  const ensure = (name, material, materialType, variety, activity, cropCert) => {
+    const key = name + '\u2014' + (material || 'Unspecified') + '\u2014' + (materialType || 'Unspecified') + '\u2014' + (variety || 'Unspecified') + '\u2014' + (activity || 'Unspecified') + '\u2014' + (cropCert || 'Unspecified');
+    if(!bins[key]) bins[key] = {bin:name, material: material || 'Unspecified', materialType: materialType || 'Unspecified', variety: variety || 'Unspecified', activity: activity || 'Unspecified', cropCert: cropCert || 'Unspecified', in:0, out:0};
+    return bins[key];
+  };
+
+  for(const l of loads){
+    const netKg = toKg(l.net, l.unit || 'kg');
+    // Only count destination as a bin receiving grain when that activity's
+    // destination actually represents a bin (not a field, as with Seed - Own Use).
+    if(l.dest && destIsBinFor(l.activity)) ensure(l.dest, l.material, l.materialType, l.variety, l.activity, l.cropCertNumber).in += netKg;
+    // Only count origin as a bin losing grain when that activity's origin
+    // actually represents a bin — Harvest's origin is a field, Purchase's is
+    // a supplier, Third Party's is a free-text name, none of which are bins.
+    if(l.origin && originIsBinFor(l.activity)) ensure(l.origin, l.material, l.materialType, l.variety, l.activity, l.cropCertNumber).out += netKg;
+  }
+
+  const body = document.getElementById('bin-body');
+  const emptyMsg = document.getElementById('bin-empty');
+  const rows = Object.values(bins).sort((a,b)=>
+    a.bin.localeCompare(b.bin) || a.material.localeCompare(b.material) || a.materialType.localeCompare(b.materialType) || a.variety.localeCompare(b.variety) || a.activity.localeCompare(b.activity) || a.cropCert.localeCompare(b.cropCert)
+  );
+
+  body.innerHTML = '';
+  if(rows.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  for(const b of rows){
+    const balanceKg = b.in - b.out;
+
+    // % Full is a whole-bin metric (total across all materials/activities in
+    // that bin vs its capacity) — the same value repeats on every row for a
+    // given bin, since this table breaks that bin down by other dimensions.
+    let pctCell = '—';
+    if(binCapacities[b.bin]){
+      const capacity = binCapacities[b.bin];
+      const {total, hasAny} = binTotalBushels(b.bin);
+      if(hasAny){
+        const pct = (total / capacity) * 100;
+        let color = 'var(--paper)';
+        if(pct >= 100) color = 'var(--rust)';
+        else if(pct >= 75) color = 'var(--safety)';
+        pctCell = `<span style="color:${color};font-weight:500;">${pct.toFixed(0)}%</span>`;
+      }
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${b.bin}</td>
+      <td>${b.activity}</td>
+      <td>${b.material}</td>
+      <td>${b.materialType}</td>
+      <td>${b.variety}</td>
+      <td>${b.cropCert}</td>
+      <td class="num">${fmtNum(fromKg(b.in))}</td>
+      <td class="num">${fmtNum(fromKg(b.out))}</td>
+      <td class="num" style="font-weight:500;">${fmtNum(fromKg(balanceKg))} ${unit}</td>
+      <td class="num">${pctCell}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function renderProduction(){
+  const harvestLoads = loads.filter(l => l.activity === 'Harvest');
+
+  // Summary by field + material + type + variety + crop cert
+  const summary = {};
+  for(const l of harvestLoads){
+    const key = (l.origin||'Unspecified') + '\u2014' + (l.material||'Unspecified') + '\u2014' + (l.materialType||'Unspecified') + '\u2014' + (l.variety||'Unspecified') + '\u2014' + (l.cropCertNumber||'Unspecified');
+    if(!summary[key]) summary[key] = {
+      field: l.origin || 'Unspecified', material: l.material || 'Unspecified',
+      materialType: l.materialType || 'Unspecified', variety: l.variety || 'Unspecified',
+      cropCert: l.cropCertNumber || 'Unspecified',
+      count: 0, netKg: 0, bushels: 0, anyBushels: false
+    };
+    const s = summary[key];
+    s.count += 1;
+    s.netKg += toKg(l.net, l.unit || 'kg');
+    const bu = computeBushels(l);
+    if(bu !== null){ s.bushels += bu; s.anyBushels = true; }
+  }
+
+  const summaryBody = document.getElementById('production-summary-body');
+  const summaryEmpty = document.getElementById('production-summary-empty');
+  const summaryRows = Object.values(summary).sort((a,b)=>
+    a.field.localeCompare(b.field) || a.material.localeCompare(b.material) || a.materialType.localeCompare(b.materialType) || a.variety.localeCompare(b.variety) || a.cropCert.localeCompare(b.cropCert)
+  );
+  summaryBody.innerHTML = '';
+  if(summaryRows.length === 0){
+    summaryEmpty.style.display = 'block';
+  }else{
+    summaryEmpty.style.display = 'none';
+    for(const s of summaryRows){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${s.field}</td>
+        <td>${s.material}</td>
+        <td>${s.materialType}</td>
+        <td>${s.variety}</td>
+        <td>${s.cropCert}</td>
+        <td class="num">${s.count}</td>
+        <td class="num">${fmtNum(fromKg(s.netKg))} ${unit}</td>
+        <td class="num">${s.anyBushels ? fmtNum(s.bushels) : '—'}</td>
+      `;
+      summaryBody.appendChild(tr);
+    }
+  }
+
+  // Detail list of individual harvest loads
+  const detailBody = document.getElementById('production-detail-body');
+  const detailEmpty = document.getElementById('production-detail-empty');
+  const detailRows = harvestLoads.slice().reverse();
+  detailBody.innerHTML = '';
+  if(detailRows.length === 0){
+    detailEmpty.style.display = 'block';
+  }else{
+    detailEmpty.style.display = 'none';
+    for(const l of detailRows){
+      const dt = new Date(l.datetime);
+      const dtStr = isNaN(dt) ? l.datetime : dt.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const bu = computeBushels(l);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${String(l.ticketNo).padStart(4,'0')}</td>
+        <td>${l.scaleTicketNo || '—'}</td>
+        <td>${dtStr}</td>
+        <td>${l.truck||'—'}</td>
+        <td>${l.driver||'—'}</td>
+        <td>${l.origin||'—'}</td>
+        <td>${l.material||'—'}</td>
+        <td>${l.materialType||'—'}</td>
+        <td>${l.variety||'—'}</td>
+        <td>${l.cropCertNumber||'—'}</td>
+        <td class="num">${l.moisture!==undefined && l.moisture!=='' ? l.moisture : '—'}</td>
+        <td class="num">${l.density!==undefined && l.density!=='' ? l.density : '—'}</td>
+        <td>${l.dest||'—'}</td>
+        <td class="num">${fmtNum(l.net)} ${l.unit}</td>
+        <td class="num">${bu === null ? '—' : (usedStandardTestWeight(l) ? '~' : '') + bu.toFixed(1)}</td>
+      `;
+      detailBody.appendChild(tr);
+    }
+  }
+}
+
+function renderMetrics(){
+  document.getElementById('m-count').textContent = loads.length;
+  const total = loads.reduce((s,l)=>s+l.net,0);
+  document.getElementById('m-total').textContent = fmtNum(total);
+  document.getElementById('m-avg').textContent = loads.length ? fmtNum(total/loads.length) : 0;
+}
+
+function renderTable(){
+  const body = document.getElementById('log-body');
+  const emptyMsg = document.getElementById('empty-msg');
+  const filter = document.getElementById('search').value.trim().toLowerCase();
+  const filtered = loads.filter(l=>{
+    if(!filter) return true;
+    return [l.truck,l.driver,l.material,l.origin,l.dest].join(' ').toLowerCase().includes(filter);
+  }).slice().reverse();
+
+  body.innerHTML = '';
+  if(filtered.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  for(const l of filtered){
+    const tr = document.createElement('tr');
+    const dt = new Date(l.datetime);
+    const dtStr = isNaN(dt) ? l.datetime : dt.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const route = [l.origin,l.dest].filter(Boolean).join(' \u2192 ');
+    tr.innerHTML = `
+      <td>${String(l.ticketNo).padStart(4,'0')}</td>
+      <td>${l.scaleTicketNo || '\u2014'}</td>
+      <td>${dtStr}</td>
+      <td>${l.truck||'—'}</td>
+      <td>${l.driver||'—'}</td>
+      <td>${l.activity||'—'}</td>
+      <td>${l.material||'—'}</td>
+      <td>${l.materialType||'—'}</td>
+      <td>${l.variety||'—'}</td>
+      <td>${l.cropCertNumber||'—'}</td>
+      <td class="num">${l.moisture!==undefined && l.moisture!=='' ? l.moisture : '—'}</td>
+      <td class="num">${l.density!==undefined && l.density!=='' ? l.density : '—'}</td>
+      <td>${route||'—'}</td>
+      <td class="num">${fmtNum(l.gross)}</td>
+      <td class="num">${fmtNum(l.tare)}</td>
+      <td class="num">${fmtNum(l.net)} ${l.unit}</td>
+      <td class="num">${(() => { const bu = computeBushels(l); if(bu === null) return '—'; return (usedStandardTestWeight(l) ? '~' : '') + bu.toFixed(1); })()}</td>
+      <td class="actions-col" style="white-space:nowrap;">
+        <button class="del-btn edit-row-btn" data-id="${l.id}" aria-label="Edit ticket ${l.ticketNo}" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">edit</button>
+        <button class="del-btn print-row-btn" data-id="${l.id}" aria-label="Print ticket ${l.ticketNo}" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">print</button>
+        <button class="del-btn delete-row-btn" data-id="${l.id}" aria-label="Delete load ${l.ticketNo}">&times;</button>
+      </td>
+    `;
+    body.appendChild(tr);
+  }
+
+  body.querySelectorAll('.delete-row-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-id');
+      loads = loads.filter(l=>String(l.id) !== id);
+      if(String(editingId) === id){
+        exitEditMode();
+      }
+      await deleteLoadRemote(id);
+      updateTicketNo();
+      renderTable();
+      renderInventory();
+  renderProduction();
+      renderMetrics();
+      renderDatalists();
+    });
+  });
+}
+
+function exportXlsx(){
+  const header = ['Ticket','Scale ticket #','Date','Truck','Driver','Activity','Material','Material type','Variety','Crop cert #','Moisture %','Test weight','Origin','Destination','Gross','Tare','Net','Bushels','Bushels estimated','Unit','Notes'];
+  const rows = loads.map(l=>{
+    const dt = new Date(l.datetime);
+    const bu = computeBushels(l);
+    return [
+      l.ticketNo,
+      l.scaleTicketNo || '',
+      isNaN(dt) ? l.datetime : dt,
+      l.truck, l.driver, l.activity || '', l.material, l.materialType || '', l.variety || '',
+      l.cropCertNumber || '',
+      l.moisture === '' || l.moisture === undefined ? '' : Number(l.moisture),
+      l.density === '' || l.density === undefined ? '' : Number(l.density),
+      l.origin, l.dest,
+      l.gross, l.tare, l.net,
+      bu !== null ? Number(bu.toFixed(1)) : '',
+      bu !== null && usedStandardTestWeight(l) ? 'Yes' : '',
+      l.unit,
+      l.notes || ''
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+  // Column widths, roughly matched to content
+  ws['!cols'] = [
+    {wch:8},{wch:14},{wch:18},{wch:10},{wch:14},{wch:12},{wch:16},{wch:16},{wch:16},{wch:14},{wch:11},{wch:11},
+    {wch:14},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14},{wch:6},{wch:24}
+  ];
+
+  // Number format on weight/quality columns, date format on date column
+  const numFmt = '#,##0';
+  const decFmt = '#,##0.0';
+  for(let r = 1; r <= rows.length; r++){
+    ['O','P','Q'].forEach(col=>{
+      const cell = ws[col + (r+1)];
+      if(cell) cell.z = numFmt;
+    });
+    ['K','L','R'].forEach(col=>{
+      const cell = ws[col + (r+1)];
+      if(cell) cell.z = decFmt;
+    });
+    const dateCell = ws['C' + (r+1)];
+    if(dateCell && dateCell.t !== 's') dateCell.z = 'yyyy-mm-dd hh:mm';
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Load log');
+  XLSX.writeFile(wb, 'scale-load-log.xlsx');
+}
+
+async function submitLoad(){
+  const activity = document.getElementById('f-activity').value;
+  if(!activity){
+    document.getElementById('activity-err').classList.add('show');
+    return;
+  }
+  document.getElementById('activity-err').classList.remove('show');
+
+  const materialType = document.getElementById('f-material-type').value;
+  if(!materialType){
+    document.getElementById('material-type-err').classList.add('show');
+    return;
+  }
+  document.getElementById('material-type-err').classList.remove('show');
+
+  const originValue = getOriginValue();
+  if(!originValue){
+    document.getElementById('origin-err').classList.add('show');
+    return;
+  }
+  document.getElementById('origin-err').classList.remove('show');
+
+  const destValue = getDestValue();
+  if(destRequiredFor(activity) && !destValue){
+    document.getElementById('dest-err').classList.add('show');
+    return;
+  }
+  document.getElementById('dest-err').classList.remove('show');
+
+  const net = updateReadout();
+  const gross = parseFloat(document.getElementById('f-gross').value);
+  const tare = parseFloat(document.getElementById('f-tare').value);
+  if(isNaN(gross) || isNaN(tare) || net === null){
+    document.getElementById('weight-err').classList.add('show');
+    document.getElementById('weight-err').textContent = isNaN(gross)||isNaN(tare)
+      ? 'Enter both gross and tare weight.'
+      : 'Gross weight must be greater than tare weight.';
+    return;
+  }
+
+  const isEditing = editingId !== null;
+  const existing = isEditing ? loads.find(l => String(l.id) === String(editingId)) : null;
+
+  const entry = {
+    id: isEditing ? existing.id : (Date.now() + '-' + Math.random().toString(36).slice(2,7)),
+    ticketNo: isEditing ? existing.ticketNo : loads.length + 1,
+    scaleTicketNo: document.getElementById('f-scale-ticket').value.trim(),
+    datetime: document.getElementById('f-datetime').value || new Date().toISOString(),
+    truck: document.getElementById('f-truck').value.trim(),
+    driver: document.getElementById('f-driver').value.trim(),
+    activity,
+    material: document.getElementById('f-material').value.trim(),
+    materialType: document.getElementById('f-material-type').value,
+    variety: document.getElementById('f-variety').value.trim(),
+    cropCertNumber: document.getElementById('f-crop-cert').value.trim(),
+    moisture: document.getElementById('f-moisture').value.trim(),
+    density: document.getElementById('f-density').value.trim(),
+    origin: originValue,
+    dest: destValue,
+    gross, tare, net, unit,
+    notes: document.getElementById('f-notes').value.trim()
+  };
+
+  if(isEditing){
+    const idx = loads.findIndex(l => String(l.id) === String(editingId));
+    if(idx !== -1) loads[idx] = entry;
+    lastRecordedLoad = entry;
+    document.getElementById('print-btn').style.display = 'block';
+    await updateLoadRemote(entry);
+    exitEditMode();
+  }else{
+    loads.push(entry);
+    lastRecordedLoad = entry;
+    document.getElementById('print-btn').style.display = 'block';
+    await addLoadRemote(entry);
+  }
+
+  document.getElementById('f-truck').value = '';
+  document.getElementById('f-scale-ticket').value = '';
+  document.getElementById('f-driver').value = '';
+  document.getElementById('f-activity').value = '';
+  document.getElementById('f-material').value = '';
+  document.getElementById('f-material-type').value = '';
+  document.getElementById('f-variety').value = '';
+  document.getElementById('f-crop-cert').value = '';
+  document.getElementById('f-moisture').value = '';
+  document.getElementById('f-density').value = '';
+  document.getElementById('f-dest').value = '';
+  document.getElementById('f-gross').value = '';
+  document.getElementById('f-tare').value = '';
+  document.getElementById('f-notes').value = '';
+  updateOriginField();
+  updateDestField();
+  setDefaultDatetime();
+  updateTicketNo();
+  updateReadout();
+  renderTable();
+  renderInventory();
+  renderProduction();
+  renderMetrics();
+  renderDatalists();
+}
+
+function startEdit(load){
+  editingId = load.id;
+  document.getElementById('f-scale-ticket').value = load.scaleTicketNo || '';
+  const dt = new Date(load.datetime);
+  if(!isNaN(dt)){
+    dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+    document.getElementById('f-datetime').value = dt.toISOString().slice(0,16);
+  }
+  document.getElementById('f-truck').value = load.truck || '';
+  document.getElementById('f-driver').value = load.driver || '';
+  document.getElementById('f-activity').value = load.activity || '';
+  document.getElementById('f-material').value = load.material || '';
+  document.getElementById('f-material-type').value = load.materialType || '';
+  document.getElementById('f-variety').value = load.variety || '';
+  document.getElementById('f-crop-cert').value = load.cropCertNumber || '';
+  document.getElementById('f-moisture').value = load.moisture || '';
+  document.getElementById('f-density').value = load.density || '';
+  updateOriginField();
+  document.getElementById('f-origin').value = load.origin || '';
+  updateDestField();
+  document.getElementById('f-dest').value = load.dest || '';
+  document.getElementById('f-gross').value = load.gross;
+  document.getElementById('f-tare').value = load.tare;
+  document.getElementById('f-notes').value = load.notes || '';
+  setUnit(load.unit || 'lb');
+  updateReadout();
+
+  document.getElementById('ticket-no').textContent = String(load.ticketNo).padStart(4,'0');
+  document.getElementById('submit-btn').textContent = 'Save changes';
+  document.getElementById('cancel-edit-btn').style.display = 'block';
+  document.getElementById('print-btn').style.display = 'none';
+
+  document.querySelector('.ticket').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function exitEditMode(){
+  editingId = null;
+  document.getElementById('submit-btn').textContent = 'Record load';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+}
+
+function printLoad(load){
+  document.getElementById('pt-no').textContent = 'No. ' + String(load.ticketNo).padStart(4,'0');
+  document.getElementById('pt-scale-no').textContent = load.scaleTicketNo || '\u2014';
+  const dt = new Date(load.datetime);
+  document.getElementById('pt-date').textContent = isNaN(dt) ? load.datetime : dt.toLocaleString();
+  document.getElementById('pt-truck').textContent = load.truck || '\u2014';
+  document.getElementById('pt-driver').textContent = load.driver || '\u2014';
+  document.getElementById('pt-activity').textContent = load.activity || '\u2014';
+  document.getElementById('pt-material').textContent = load.material || '\u2014';
+  document.getElementById('pt-type-row').style.display = load.materialType ? 'flex' : 'none';
+  document.getElementById('pt-type').textContent = load.materialType || '';
+  document.getElementById('pt-variety-row').style.display = load.variety ? 'flex' : 'none';
+  document.getElementById('pt-variety').textContent = load.variety || '';
+  document.getElementById('pt-cropcert-row').style.display = load.cropCertNumber ? 'flex' : 'none';
+  document.getElementById('pt-cropcert').textContent = load.cropCertNumber || '';
+
+  const hasQuality = load.moisture || load.density;
+  document.getElementById('pt-quality-row').style.display = hasQuality ? 'flex' : 'none';
+  document.getElementById('pt-quality').textContent =
+    [load.moisture ? load.moisture + '%' : null, load.density ? load.density : null].filter(Boolean).join(' / ');
+
+  const route = [load.origin, load.dest].filter(Boolean).join(' \u2192 ');
+  document.getElementById('pt-route').textContent = route || '\u2014';
+  document.getElementById('pt-gross').textContent = fmtNum(load.gross) + ' ' + load.unit;
+  document.getElementById('pt-tare').textContent = fmtNum(load.tare) + ' ' + load.unit;
+  document.getElementById('pt-net').textContent = fmtNum(load.net) + ' ' + load.unit;
+  const buVal = computeBushels(load);
+  document.getElementById('pt-bushels-row').style.display = buVal !== null ? 'flex' : 'none';
+  document.getElementById('pt-bushels').textContent = buVal !== null
+    ? buVal.toFixed(1) + ' bu' + (usedStandardTestWeight(load) ? ' (estimated)' : '')
+    : '';
+
+  window.print();
+}
+
+let lastRecordedLoad = null;
+
+document.getElementById('f-gross').addEventListener('input', updateReadout);
+document.getElementById('f-material-type').addEventListener('change', ()=>{
+  if(document.getElementById('f-material-type').value){
+    document.getElementById('material-type-err').classList.remove('show');
+  }
+});
+document.getElementById('f-tare').addEventListener('input', updateReadout);
+document.getElementById('f-density').addEventListener('input', updateReadout);
+document.getElementById('f-material').addEventListener('change', updateReadout);
+document.getElementById('unit-kg').addEventListener('click', ()=>setUnit('kg'));
+document.getElementById('unit-lb').addEventListener('click', ()=>setUnit('lb'));
+document.getElementById('submit-btn').addEventListener('click', submitLoad);
+document.getElementById('cancel-edit-btn').addEventListener('click', ()=>{
+  exitEditMode();
+  document.getElementById('f-truck').value = '';
+  document.getElementById('f-scale-ticket').value = '';
+  document.getElementById('f-driver').value = '';
+  document.getElementById('f-activity').value = '';
+  document.getElementById('f-material').value = '';
+  document.getElementById('f-material-type').value = '';
+  document.getElementById('f-variety').value = '';
+  document.getElementById('f-crop-cert').value = '';
+  document.getElementById('f-moisture').value = '';
+  document.getElementById('f-density').value = '';
+  document.getElementById('f-dest').value = '';
+  document.getElementById('f-gross').value = '';
+  document.getElementById('f-tare').value = '';
+  document.getElementById('f-notes').value = '';
+  updateOriginField();
+  updateDestField();
+  setDefaultDatetime();
+  updateTicketNo();
+  updateReadout();
+});
+document.getElementById('print-btn').addEventListener('click', ()=>{
+  if(lastRecordedLoad) printLoad(lastRecordedLoad);
+});
+document.getElementById('log-body').addEventListener('click', (e)=>{
+  const printBtn = e.target.closest('.print-row-btn');
+  if(printBtn){
+    const load = loads.find(l => String(l.id) === printBtn.getAttribute('data-id'));
+    if(load) printLoad(load);
+    return;
+  }
+  const editBtn = e.target.closest('.edit-row-btn');
+  if(editBtn){
+    const load = loads.find(l => String(l.id) === editBtn.getAttribute('data-id'));
+    if(load) startEdit(load);
+    return;
+  }
+});
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('csv-btn').addEventListener('click', exportXlsx);
+function showTab(tabName){
+  const panels = {
+    ledger:'ledger-panel', bins:'bin-panel', capacity:'capacity-panel',
+    standard:'standard-panel', production:'production-panel'
+  };
+  const buttons = {
+    ledger:'tab-ledger-btn', bins:'tab-bins-btn', capacity:'tab-capacity-btn',
+    standard:'tab-standard-btn', production:'tab-production-btn'
+  };
+  for(const key of Object.keys(panels)){
+    document.getElementById(panels[key]).style.display = (key === tabName) ? 'block' : 'none';
+    document.getElementById(buttons[key]).classList.toggle('active', key === tabName);
+  }
+}
+document.getElementById('tab-ledger-btn').addEventListener('click', ()=>showTab('ledger'));
+document.getElementById('tab-bins-btn').addEventListener('click', ()=>showTab('bins'));
+document.getElementById('tab-capacity-btn').addEventListener('click', ()=>showTab('capacity'));
+document.getElementById('tab-standard-btn').addEventListener('click', ()=>showTab('standard'));
+document.getElementById('tab-production-btn').addEventListener('click', ()=>showTab('production'));
+
+setDefaultDatetime();
+document.getElementById('density-label').textContent = 'Test weight (lb/bu)';
+document.getElementById('storage-note').textContent = useSheets
+  ? 'Synced to Google Sheets — shared with everyone using this link'
+  : useClaudeStorage
+    ? 'Shared ledger — every entry is visible to everyone using this file'
+    : 'Saved on this device only';
+wireAddNewHandlers();
+updateOriginField();
+updateDestField();
+document.getElementById('cap-bin-save').addEventListener('click', async ()=>{
+  const bin = document.getElementById('cap-bin-select').value;
+  const capacity = parseFloat(document.getElementById('cap-bin-value').value);
+  if(!bin || isNaN(capacity) || capacity <= 0) return;
+  await setBinCapacityRemote(bin, capacity);
+  document.getElementById('cap-bin-value').value = '';
+  renderBinCapacityStatus();
+  updateDestCapacityWarning();
+});
+document.getElementById('std-weight-save').addEventListener('click', async ()=>{
+  const material = document.getElementById('std-material-select').value;
+  const weight = parseFloat(document.getElementById('std-weight-value').value);
+  if(!material || isNaN(weight) || weight <= 0) return;
+  await setMaterialStandardWeightRemote(material, weight);
+  document.getElementById('std-weight-value').value = '';
+  renderStandardWeightsStatus();
+  renderBinCapacityStatus();
+  updateDestCapacityWarning();
+  updateReadout();
+});
+Promise.all([loadExtraValues(), loadBinCapacities(), loadMaterialStandardWeights()]).then(loadData);
+</script>
+</body>
+</html>
