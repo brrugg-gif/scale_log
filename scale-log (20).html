@@ -722,460 +722,153 @@ let loads = [];
 let unit = 'lb';
 let editingId = null;
 
-function fmtNum(n){
-  return Math.round(n).toLocaleString();
-}
 
-function setDefaultDatetime(){
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('f-datetime').value = now.toISOString().slice(0,16);
+function getSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Loads');
 }
-
-function updateTicketNo(){
-  document.getElementById('ticket-no').textContent = String(loads.length + 1).padStart(4,'0');
+ 
+function getListsSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lists');
 }
-
-function updateBushelReadout(net){
-  const box = document.getElementById('bushel-readout');
-  const val = document.getElementById('bushel-val');
-  if(net === null){
-    box.style.display = 'none';
-    return;
+ 
+function getCapacitySheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('BinCapacities');
+}
+ 
+function getMaterialStandardsSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('MaterialTestWeights');
+}
+ 
+function doGet(e) {
+  if (e.parameter && e.parameter.type === 'lists') {
+    var listSheet = getListsSheet();
+    var rows = listSheet.getDataRange().getValues();
+    var lists = rows.slice(1)
+      .filter(function(r){ return r[0] !== '' && r[1] !== ''; })
+      .map(function(r){ return {field: r[0], value: r[1]}; });
+    return ContentService.createTextOutput(JSON.stringify(lists))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  const density = document.getElementById('f-density').value;
-  const material = document.getElementById('f-material').value;
-  const pseudoLoad = {net, density, unit, material};
-  const bu = computeBushels(pseudoLoad);
-  if(bu === null){
-    box.style.display = 'none';
-    return;
+ 
+  if (e.parameter && e.parameter.type === 'capacities') {
+    var capSheet = getCapacitySheet();
+    var rows = capSheet.getDataRange().getValues();
+    var caps = rows.slice(1)
+      .filter(function(r){ return r[0] !== '' && r[1] !== ''; })
+      .map(function(r){ return {bin: r[0], capacity: r[1]}; });
+    return ContentService.createTextOutput(JSON.stringify(caps))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  box.style.display = 'flex';
-  const estimated = usedStandardTestWeight(pseudoLoad);
-  val.textContent = (estimated ? '~' : '') + bu.toFixed(1) + ' bu' + (estimated ? ' (estimated)' : '');
-}
-
-function updateReadout(){
-  const gross = parseFloat(document.getElementById('f-gross').value);
-  const tare = parseFloat(document.getElementById('f-tare').value);
-  const readout = document.getElementById('net-readout');
-  const err = document.getElementById('weight-err');
-  if(isNaN(gross) || isNaN(tare)){
-    readout.textContent = '—';
-    readout.classList.remove('bad');
-    err.classList.remove('show');
-    updateBushelReadout(null);
-    return null;
+ 
+  if (e.parameter && e.parameter.type === 'materialStandards') {
+    var stdSheet = getMaterialStandardsSheet();
+    var rows = stdSheet.getDataRange().getValues();
+    var stds = rows.slice(1)
+      .filter(function(r){ return r[0] !== '' && r[1] !== ''; })
+      .map(function(r){ return {material: r[0], weight: r[1]}; });
+    return ContentService.createTextOutput(JSON.stringify(stds))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  const net = gross - tare;
-  if(net <= 0){
-    readout.textContent = fmtNum(net) + ' ' + unit;
-    readout.classList.add('bad');
-    err.classList.add('show');
-    updateBushelReadout(null);
-    return null;
+ 
+  var sheet = getSheet();
+  var rows = sheet.getDataRange().getValues();
+  var loads = rows.slice(1).filter(function(r){ return r[0] !== ''; }).map(function(r){
+    return {
+      id: r[0], ticketNo: r[1], scaleTicketNo: r[2], cropYear: r[3], datetime: r[4], truck: r[5], driver: r[6],
+      activity: r[7], material: r[8], materialType: r[9], variety: r[10], cropCertNumber: r[11],
+      moisture: r[12], density: r[13], origin: r[14], dest: r[15],
+      gross: r[16], tare: r[17], net: r[18], unit: r[19], notes: r[20]
+    };
+  });
+  return ContentService.createTextOutput(JSON.stringify(loads))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+ 
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var sheet = getSheet();
+ 
+  if (data.action === 'add') {
+    var l = data.load;
+    sheet.appendRow([l.id, l.ticketNo, l.scaleTicketNo, l.cropYear, l.datetime, l.truck, l.driver, l.activity,
+                      l.material, l.materialType, l.variety, l.cropCertNumber, l.moisture, l.density,
+                      l.origin, l.dest, l.gross, l.tare, l.net, l.unit, l.notes]);
   }
-  readout.textContent = fmtNum(net) + ' ' + unit;
-  readout.classList.remove('bad');
-  err.classList.remove('show');
-  updateBushelReadout(net);
-  return net;
-}
-
-function setUnit(u){
-  unit = u;
-  document.getElementById('unit-kg').classList.toggle('active', u==='kg');
-  document.getElementById('unit-lb').classList.toggle('active', u==='lb');
-  document.getElementById('density-label').textContent = u==='kg' ? 'Test weight (kg/hL)' : 'Test weight (lb/bu)';
-  updateReadout();
-  renderTable();
-  renderInventory();
-  renderBinTransactions();
-  renderProduction();
-  renderMetrics();
-}
-
-function renderDatalists(){
-  renderFixedSelects();
-  updateOriginField();
-  updateDestField();
-  updateDestCapacityWarning();
-  renderBinCapacityStatus();
-  renderStandardWeightsStatus();
-}
-
-const FIXED_FIELD_CONFIG = {
-  truck:  {selectId:'f-truck',  label:'truck',  defaults:[]},
-  driver: {selectId:'f-driver', label:'driver', defaults:[]},
-  material: {selectId:'f-material', label:'material', defaults:[]},
-  materialType: {selectId:'f-material-type', label:'material type', defaults:['Pedigree - Unclean','Pedigree - Clean','Commercial']},
-  variety: {selectId:'f-variety', label:'variety', defaults:[]},
-  cropYear: {selectId:'f-crop-year', label:'crop year', defaults:['2024','2025','2026','2027']}
-};
-let extraValues = {truck:[], driver:[], material:[], materialType:[], variety:[], dest:[], field:[], supplier:[], buyer:[], thirdParty:[], cropYear:[]};
-
-async function loadExtraValues(){
-  if(useSheets){
-    try{
-      const res = await fetch(SHEETS_URL + '?type=lists');
-      if(!res.ok) throw new Error('Lists sheet returned status ' + res.status);
-      const rows = await res.json();
-      const grouped = {truck:[], driver:[], material:[], materialType:[], variety:[], dest:[], field:[], supplier:[], buyer:[], thirdParty:[], cropYear:[]};
-      for(const r of rows){
-        if(!grouped[r.field]) grouped[r.field] = [];
-        grouped[r.field].push(r.value);
+ 
+  if (data.action === 'update') {
+    var l = data.load;
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(l.id)) {
+        sheet.getRange(i + 1, 1, 1, 21).setValues([[
+          l.id, l.ticketNo, l.scaleTicketNo, l.cropYear, l.datetime, l.truck, l.driver, l.activity,
+          l.material, l.materialType, l.variety, l.cropCertNumber, l.moisture, l.density,
+          l.origin, l.dest, l.gross, l.tare, l.net, l.unit, l.notes
+        ]]);
+        break;
       }
-      extraValues = grouped;
-    }catch(e){
-      console.error('Could not load shared lists', e);
     }
-    return;
   }
-  const key = 'scale-extra-values';
-  try{
-    if(useClaudeStorage){
-      const res = await window.storage.get(key, true);
-      if(res && res.value) extraValues = Object.assign(extraValues, JSON.parse(res.value));
-    }else{
-      const raw = localStorage.getItem(key);
-      if(raw) extraValues = Object.assign(extraValues, JSON.parse(raw));
-    }
-  }catch(e){ /* start with defaults */ }
-}
-
-async function saveExtraValues(){
-  const key = 'scale-extra-values';
-  try{
-    if(useClaudeStorage){
-      await window.storage.set(key, JSON.stringify(extraValues), true);
-    }else{
-      localStorage.setItem(key, JSON.stringify(extraValues));
-    }
-  }catch(e){ console.error('Could not save extra values', e); }
-}
-
-async function addExtraValueRemote(fieldKey, value){
-  if(useSheets){
-    try{
-      await fetch(SHEETS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({action: 'addValue', field: fieldKey, value})
-      });
-      // Don't re-fetch immediately after posting — the sheet write can lag
-      // slightly behind the response, and re-fetching too soon would wipe
-      // out the value we just added locally before the sheet catches up.
-      // The local extraValues update (done by the caller) is authoritative
-      // for this session; other devices pick it up on their next page load.
-    }catch(e){
-      console.error('Could not sync new value to Google Sheets', e);
-    }
-  }else{
-    await saveExtraValues();
-  }
-}
-
-let binCapacities = {};
-
-async function loadBinCapacities(){
-  if(useSheets){
-    try{
-      const res = await fetch(SHEETS_URL + '?type=capacities');
-      if(!res.ok) throw new Error('Capacities sheet returned status ' + res.status);
-      const rows = await res.json();
-      const grouped = {};
-      for(const r of rows){
-        const num = parseFloat(r.capacity);
-        if(!isNaN(num)) grouped[r.bin] = num;
+ 
+  if (data.action === 'delete') {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(data.id)) {
+        sheet.deleteRow(i + 1);
+        break;
       }
-      binCapacities = grouped;
-    }catch(e){
-      console.error('Could not load bin capacities', e);
-    }
-    return;
-  }
-  const key = 'scale-bin-capacities';
-  try{
-    if(useClaudeStorage){
-      const res = await window.storage.get(key, true);
-      if(res && res.value) binCapacities = JSON.parse(res.value);
-    }else{
-      const raw = localStorage.getItem(key);
-      if(raw) binCapacities = JSON.parse(raw);
-    }
-  }catch(e){ /* start empty */ }
-}
-
-async function setBinCapacityRemote(bin, capacity){
-  binCapacities[bin] = capacity;
-  if(useSheets){
-    try{
-      await fetch(SHEETS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({action: 'setCapacity', bin, capacity})
-      });
-    }catch(e){
-      console.error('Could not sync bin capacity to Google Sheets', e);
-    }
-  }else{
-    const key = 'scale-bin-capacities';
-    try{
-      if(useClaudeStorage){
-        await window.storage.set(key, JSON.stringify(binCapacities), true);
-      }else{
-        localStorage.setItem(key, JSON.stringify(binCapacities));
-      }
-    }catch(e){ console.error('Could not save bin capacity', e); }
-  }
-}
-
-function binTotalBushels(binName){
-  let total = 0;
-  let hasAny = false;
-  let missingTestWeight = false;
-  let usedEstimate = false;
-  for(const l of loads){
-    const bu = computeBushels(l);
-    const isDest = l.dest === binName && destIsBinFor(l.activity);
-    const isOrigin = l.origin === binName && originIsBinFor(l.activity);
-    if(!isDest && !isOrigin) continue;
-    if(bu === null){ missingTestWeight = true; continue; }
-    if(usedStandardTestWeight(l)) usedEstimate = true;
-    if(isDest){ total += bu; hasAny = true; }
-    if(isOrigin){ total -= bu; hasAny = true; }
-  }
-  return {total, hasAny, missingTestWeight, usedEstimate};
-}
-
-function optionsFor(fieldKey){
-  const cfg = FIXED_FIELD_CONFIG[fieldKey];
-  const fromLoads = loads.map(l=>l[fieldKey]).filter(Boolean);
-  const combined = new Set([...cfg.defaults, ...(extraValues[fieldKey]||[]), ...fromLoads]);
-  return [...combined].sort();
-}
-
-function currentOriginMode(){
-  const act = document.getElementById('f-activity').value;
-  if(act === 'Harvest') return 'field';
-  if(act === 'Transfer' || act === 'Sell' || act === 'Seed - Own Use') return 'bin';
-  if(act === 'Purchase') return 'supplier';
-  if(act === 'Third Party') return 'thirdParty';
-  return 'none';
-}
-
-function originBucketKey(mode){
-  if(mode === 'bin') return 'dest';
-  if(mode === 'field') return 'field';
-  if(mode === 'supplier') return 'supplier';
-  if(mode === 'thirdParty') return 'thirdParty';
-  return null;
-}
-
-function bucketOptions(bucketKey){
-  if(bucketKey === 'dest'){
-    // Only loads where the destination actually functioned as a bin —
-    // Seed - Own Use stores a field name in dest, Sell stores a buyer name,
-    // neither of which should leak into the bin list.
-    const historical = loads.filter(l => l.dest && l.activity !== 'Seed - Own Use' && l.activity !== 'Sell').map(l => l.dest);
-    return [...new Set([...(extraValues.dest||[]), ...historical])].sort();
-  }
-  if(bucketKey === 'field'){
-    const historical = [
-      ...loads.filter(l => l.activity === 'Harvest').map(l => l.origin),
-      ...loads.filter(l => l.activity === 'Seed - Own Use').map(l => l.dest)
-    ].filter(Boolean);
-    return [...new Set([...(extraValues.field||[]), ...historical])].sort();
-  }
-  if(bucketKey === 'supplier'){
-    const historical = loads.filter(l => l.activity === 'Purchase').map(l => l.origin).filter(Boolean);
-    return [...new Set([...(extraValues.supplier||[]), ...historical])].sort();
-  }
-  if(bucketKey === 'buyer'){
-    const historical = loads.filter(l => l.activity === 'Sell').map(l => l.dest).filter(Boolean);
-    return [...new Set([...(extraValues.buyer||[]), ...historical])].sort();
-  }
-  if(bucketKey === 'thirdParty'){
-    const historical = loads.filter(l => l.activity === 'Third Party').map(l => l.origin).filter(Boolean);
-    return [...new Set([...(extraValues.thirdParty||[]), ...historical])].sort();
-  }
-  return optionsFor(bucketKey);
-}
-
-function updateOriginField(){
-  const mode = currentOriginMode();
-  const selectEl = document.getElementById('f-origin');
-  const labelEl = document.getElementById('origin-label');
-  const errEl = document.getElementById('origin-err');
-  errEl.classList.remove('show');
-
-  if(mode === 'none'){
-    selectEl.style.display = 'none';
-    labelEl.textContent = 'Origin';
-    errEl.textContent = 'Select an activity first.';
-    return;
-  }
-
-  selectEl.style.display = 'block';
-  const addLabel = mode === 'field' ? 'field' : mode === 'bin' ? 'bin' : mode === 'supplier' ? 'supplier' : 'third party';
-  labelEl.textContent = 'Origin (' + addLabel + ')';
-  errEl.textContent = 'Select a ' + addLabel + '.';
-
-  const bucketKey = originBucketKey(mode);
-  const current = selectEl.value;
-  const opts = bucketOptions(bucketKey);
-  selectEl.innerHTML =
-    `<option value="">Select ${addLabel}…</option>` +
-    opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
-    `<option value="__add_new__">+ Add new ${addLabel}</option>`;
-  if(opts.includes(current)) selectEl.value = current;
-}
-
-function getOriginValue(){
-  if(currentOriginMode() === 'none') return '';
-  return document.getElementById('f-origin').value;
-}
-
-function currentDestMode(){
-  const act = document.getElementById('f-activity').value;
-  if(act === 'Seed - Own Use') return 'field';
-  if(act === 'Sell') return 'buyer';
-  return 'bin';
-}
-
-function destBucketKey(mode){
-  if(mode === 'field') return 'field';
-  if(mode === 'buyer') return 'buyer';
-  return 'dest';
-}
-
-function destRequiredFor(activity){
-  return activity !== 'Third Party' && activity !== 'Sell';
-}
-
-function getDestValue(){
-  return document.getElementById('f-dest').value;
-}
-
-function updateDestField(){
-  const act = document.getElementById('f-activity').value;
-  const required = destRequiredFor(act);
-  const mode = currentDestMode();
-  const selectEl = document.getElementById('f-dest');
-  const labelEl = document.getElementById('dest-label');
-  const bucketKey = destBucketKey(mode);
-  const addLabel = mode === 'field' ? 'field' : mode === 'buyer' ? 'buyer' : 'bin';
-
-  labelEl.innerHTML = (mode === 'field' ? 'Destination (field)' : mode === 'buyer' ? 'Destination (buyer)' : 'Destination') +
-    (required ? ' <span style="color:var(--rust);">*</span>' : '');
-  document.getElementById('dest-err').textContent = mode === 'field'
-    ? 'Select a field.'
-    : mode === 'buyer'
-      ? 'Select a buyer.'
-      : 'Destination is required for this activity.';
-  document.getElementById('dest-err').classList.remove('show');
-
-  const current = selectEl.value;
-  const opts = bucketOptions(bucketKey);
-  selectEl.innerHTML =
-    `<option value="">Select ${addLabel}…</option>` +
-    opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
-    `<option value="__add_new__">+ Add new ${addLabel}</option>`;
-  if(opts.includes(current)) selectEl.value = current;
-}
-
-function updateDestCapacityWarning(){
-  const warningEl = document.getElementById('dest-capacity-warning');
-  if(currentDestMode() !== 'bin'){
-    warningEl.style.display = 'none';
-    return;
-  }
-  const binName = document.getElementById('f-dest').value;
-  if(!binName){
-    warningEl.style.display = 'none';
-    return;
-  }
-
-  const capacity = binCapacities[binName];
-  const {total, hasAny, missingTestWeight, usedEstimate} = binTotalBushels(binName);
-
-  if(!hasAny && !capacity){
-    warningEl.style.display = 'none';
-    return;
-  }
-
-  let note = '';
-  if(missingTestWeight) note = ' (some loads missing test weight and no standard set, actual level may be higher)';
-  else if(usedEstimate) note = ' (includes loads estimated from standard test weight)';
-
-  let text = binName + ': ' + (hasAny ? fmtNum(total) + ' bu currently' : 'no inventory recorded yet');
-  let color = 'var(--steel-light)';
-
-  if(capacity){
-    const pct = hasAny ? (total / capacity) * 100 : 0;
-    text += ' \u2014 ' + pct.toFixed(0) + '% of ' + fmtNum(capacity) + ' bu capacity';
-    if(pct >= 100) color = 'var(--rust)';
-    else if(pct >= 75) color = 'var(--safety)';
-  }
-  text += note;
-
-  warningEl.style.display = 'block';
-  warningEl.style.color = color;
-  warningEl.textContent = text;
-}
-
-function renderFixedSelects(){
-  for(const fieldKey of Object.keys(FIXED_FIELD_CONFIG)){
-    const cfg = FIXED_FIELD_CONFIG[fieldKey];
-    const select = document.getElementById(cfg.selectId);
-    const current = select.value;
-    const opts = optionsFor(fieldKey);
-    const placeholder = fieldKey === 'materialType' ? 'Select type…' : `Select ${cfg.label}…`;
-    select.innerHTML =
-      `<option value="">${placeholder}</option>` +
-      opts.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('') +
-      `<option value="__add_new__">+ Add new ${cfg.label}</option>`;
-    if(opts.includes(current)) select.value = current;
-    // Crop year should always start on 2026 rather than blank, unless
-    // something has already set it (editing a load, or a prior choice).
-    if(fieldKey === 'cropYear' && select.value === '' && opts.includes('2026')){
-      select.value = '2026';
     }
   }
-}
-
-function wireAddNewHandlers(){
-  for(const fieldKey of Object.keys(FIXED_FIELD_CONFIG)){
-    const cfg = FIXED_FIELD_CONFIG[fieldKey];
-    const select = document.getElementById(cfg.selectId);
-    select.addEventListener('change', async ()=>{
-      if(select.value !== '__add_new__') {
-        if(fieldKey === 'materialType' && select.value){
-          document.getElementById('material-type-err').classList.remove('show');
-        }
-        return;
-      }
-      const entered = window.prompt(`New ${cfg.label}:`);
-      if(!entered || !entered.trim()){
-        select.value = '';
-        return;
-      }
-      const value = entered.trim();
-      if(!extraValues[fieldKey]) extraValues[fieldKey] = [];
-      if(!extraValues[fieldKey].some(v => v.toLowerCase() === value.toLowerCase())){
-        extraValues[fieldKey].push(value);
-        await addExtraValueRemote(fieldKey, value);
-      }
-      renderFixedSelects();
-      select.value = value;
-      if(fieldKey === 'materialType'){
-        document.getElementById('material-type-err').classList.remove('show');
-      }
+ 
+  if (data.action === 'addValue') {
+    var listSheet = getListsSheet();
+    var rows = listSheet.getDataRange().getValues();
+    var exists = rows.slice(1).some(function(r){
+      return String(r[0]).toLowerCase() === String(data.field).toLowerCase()
+        && String(r[1]).toLowerCase() === String(data.value).toLowerCase();
     });
+    if (!exists) {
+      listSheet.appendRow([data.field, data.value]);
+    }
   }
+ 
+  if (data.action === 'setCapacity') {
+    var capSheet = getCapacitySheet();
+    var rows = capSheet.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).toLowerCase() === String(data.bin).toLowerCase()) {
+        foundRow = i + 1;
+        break;
+      }
+    }
+    if (foundRow > 0) {
+      capSheet.getRange(foundRow, 2).setValue(data.capacity);
+    } else {
+      capSheet.appendRow([data.bin, data.capacity]);
+    }
+  }
+ 
+  if (data.action === 'setMaterialStandard') {
+    var stdSheet = getMaterialStandardsSheet();
+    var rows = stdSheet.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).toLowerCase() === String(data.material).toLowerCase()) {
+        foundRow = i + 1;
+        break;
+      }
+    }
+    if (foundRow > 0) {
+      stdSheet.getRange(foundRow, 2).setValue(data.weight);
+    } else {
+      stdSheet.appendRow([data.material, data.weight]);
+    }
+  }
+ 
+  return ContentService.createTextOutput(JSON.stringify({status: 'ok'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
   document.getElementById('f-activity').addEventListener('change', ()=>{
     updateOriginField();
